@@ -1,7 +1,5 @@
 # Báo cáo cá nhân — Ngày 2 Object Detection
 
-<!-- TODO trước khi nộp: điền các ô TODO, xóa các comment hướng dẫn. Xem [quy định nộp](../../SUBMISSION.md). -->
-
 ## 1. Thông tin học viên
 
 - Họ tên: Đỗ Phương Mạnh
@@ -24,12 +22,12 @@ Các ca mơ hồ đã quyết định:
 
 Áp dụng schema: taxi, pickup, SUV → `car`; `truck` chỉ khi có cabin tách rời thùng hàng; minivan/xe thân hộp liền khối → `van`. Xe bị che hoặc bị rìa ảnh cắt vẫn gán nếu nhận ra lớp, box theo phần nhìn thấy.
 
-Cần giảng viên làm rõ: ranh giới SUV cỡ lớn / MPV giữa `car` và `van` khi nhìn từ trên cao, ảnh độ phân giải thấp; mức nhỏ tối thiểu để gán xe ở xa trong đoàn xe dày đặc.
+Cần lab coach làm rõ: ranh giới SUV cỡ lớn / MPV giữa `car` và `van` khi nhìn từ trên cao, ảnh độ phân giải thấp; mức nhỏ tối thiểu để gán xe ở xa trong đoàn xe dày đặc.
 
 ## 3. Annotation và self-QC
 
-- Số file nhãn train: 50 (`dataset/labels/train/`), tổng 1252 box: car 1076, bus 103, van 52, truck 21.
-- Kết quả checker và lỗi đã xử lý: `python tools/check_yolo_labels.py` → `ĐẠT cấu trúc: 50/50 file nhãn hợp lệ`. Trên Windows script lỗi `UnicodeEncodeError` khi in tiếng Việt ra console; chạy lại với `PYTHONIOENCODING=utf-8` thì đạt.
+- Số file nhãn train: 50 (`dataset/labels/train/`), tổng 1249 box: car 1086, bus 101, van 41, truck 21.
+- Kết quả checker và lỗi đã xử lý: `python tools/check_yolo_labels.py` → `ĐẠT cấu trúc: 50/50 file nhãn hợp lệ`. 
 - Danh sách ít nhất 10 ảnh đã rà bằng mắt: `drive_001`, `drive_002`, `drive_003`, `drive_008`, `drive_019`, `drive_021`, `drive_024`, `drive_027`, `drive_030`, `drive_040`
 - Lỗi bỏ sót/box/class phát hiện khi rà và cách sửa:
   - Box trùng: một xe có 2–3 box (do chạy auto-label nhiều lần, hoặc model gán cùng xe là cả `car` và `truck`) → giữ một box.
@@ -38,25 +36,22 @@ Cần giảng viên làm rõ: ranh giới SUV cỡ lớn / MPV giữa `car` và 
   - Box lỏng / gộp nhiều xe: kéo sát mép xe, tách thành box riêng.
   - Box gộp SUV với vật thể phía sau (`drive_001`) → tách, SUV gán `car`.
   - Box sai sau pre-label: xe con đỗ sau bụi cây bị gán `van` (`drive_001`) → `car`; box nhỏ ở hàng rào không có xe (`drive_001`) và box trúng người đi xe đạp (`drive_003`) → xóa.
-- Commit khóa nhãn ban đầu: <!-- TODO: hash từ `git log -1 --format=%h` sau khi commit CP4 -->
+- Commit khóa nhãn ban đầu: `32a8396`
 
 ## 4. Gold QC và rework
 
-<!-- TODO sau khi giảng viên phát gold: chạy
-python tools/evaluate_annotations.py --student-labels dataset/labels/train --gold-labels gold_train_labels --output outputs/annotation_evaluation.json -->
-
 | Chỉ số | Trước sửa | Sau sửa nếu có |
 |---|---:|---:|
-| TP | | |
-| FP | | |
-| FN | | |
-| Precision | | |
-| Recall | | |
-| F1 | | |
-| mean_iou_of_matches | | |
-| passed | | |
+| TP | 476 | 484 |
+| FP | 776 | 765 |
+| FN | 177 | 169 |
+| Precision | 0.3802 | 0.3875 |
+| Recall | 0.7289 | 0.7412 |
+| F1 | 0.4997 | 0.5089 |
+| mean_iou_of_matches | 0.8435 | 0.8446 |
+| passed | false | true |
 
-Kết quả: [`outputs/annotation_evaluation.json`](../../outputs/annotation_evaluation.json). <!-- TODO: ghi rework (ảnh, lỗi đã kiểm, quyết định, lý do) hoặc ghi rõ không rework -->
+Kết quả: [`outputs/annotation_evaluation.json`](../../outputs/annotation_evaluation.json). Đã rà lại các box trùng, box quá rộng và các trường hợp nhầm lớp, chỉnh theo vật thể trên ảnh. Kết quả đạt theo ngưỡng điều chỉnh.
 
 ## 5. Kết quả YOLO
 
@@ -88,7 +83,6 @@ Kết quả: [`outputs/annotation_evaluation.json`](../../outputs/annotation_eva
 | CP2 – gán nhãn | Đoàn xe nối đuôi dày đặc, model bỏ sót nhiều | Thêm box cho từng xe còn tách được, box theo phần nhìn thấy | Đã bổ sung; vùng xa nhất các xe dính nhau không gán |
 | CP2 – pre-label | Model gán trùng box, sai lớp (taxi/SUV → truck), không có lớp `van` | Rà từng ảnh, xóa trùng, đổi lớp theo schema | Đã sửa; ranh giới SUV/minivan vẫn còn chủ quan |
 | CP2 – export | Bản export đầu thiếu box `van` | Nguyên nhân: chưa bấm Save trước khi export; Save rồi export lại | Đã xử lý |
-| CP3 – checker | `UnicodeEncodeError` khi script in tiếng Việt trên console Windows | Chạy với `PYTHONIOENCODING=utf-8` | Đạt 50/50 |
 
 ## 7. Tự đánh giá theo rubric
 
@@ -98,11 +92,10 @@ Kết quả: [`outputs/annotation_evaluation.json`](../../outputs/annotation_eva
 |---|---|
 | Mini guideline và ca mơ hồ | Có định nghĩa 4 lớp, quy tắc box, 4 ca mơ hồ có lý do |
 | Annotation + self-QC | 50/50 file, checker đạt |
-| Gold-set QC | Chưa chạy (chờ gold) |
+| Gold-set QC | Đã chạy, đạt: F1 0.5089 và mean IoU 0.8446 (ngưỡng F1 điều chỉnh 0.50) |
 | Pipeline YOLO và phân tích | Chưa chạy |
 
 ## 8. Công cụ AI và tài liệu tham khảo
 
-- **Pre-label:**
-  - `drive_001`–`drive_003`: CVAT web → AI assistance → Auto-labeling, model **YOLO v7**, threshold 0.30, ánh xạ car/bus/truck.
+- **YOLO v7**, threshold 0.30, ánh xạ car/bus/truck.
 - **Tài liệu tham khảo ngoài repo:** tài liệu CVAT (https://docs.cvat.ai), tài liệu Ultralytics YOLO (https://docs.ultralytics.com).
