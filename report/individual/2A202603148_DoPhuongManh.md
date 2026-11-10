@@ -7,7 +7,7 @@
 - Email: 26ai.manhdp@vinuni.edu.vn
 - Lớp: K5 – L2A
 - Link repo bài làm: https://github.com/manhtotbung/K5-L2A-DAY02-DoPhuongManh-2A202603148-ObjectDetection
-- Link Colab đã chạy: <!-- TODO sau CP6 -->
+- Link Colab đã chạy: https://colab.research.google.com/drive/11fWCgpfaqWaG2a8SRtzFORSyXGJf7nTq?usp=sharing
 
 ## 2. Schema và mini guideline
 
@@ -55,25 +55,45 @@ Kết quả: [`outputs/annotation_evaluation.json`](../../outputs/annotation_eva
 
 ## 5. Kết quả YOLO
 
-<!-- TODO sau CP6 (Colab) -->
-
-- Runtime, GPU/CPU, phiên bản Ultralytics và Torch:
-- Các tham số thay đổi so với notebook nếu có và lý do:
-- Đường dẫn best checkpoint trong phiên chạy:
+- Runtime, GPU/CPU, phiên bản Ultralytics và Torch: Google Colab, GPU Tesla T4 (15 GB), Ultralytics 8.4.208, Python 3.13.16, Torch 2.14.1+cu130. Notebook clone repo ở commit `566d257`; kiểm tra `OK: 50 train + 10 eval`.
+- Các tham số thay đổi so với notebook nếu có và lý do: không thay đổi (`yolo26n.pt`, 50 epoch, imgsz 640, batch tự động, seed 20260909). Train 50 epoch hết khoảng 0.022 giờ.
+- Đường dẫn best checkpoint trong phiên chạy: `/content/Day2-Lab/outputs/yolo26_runs/vehicle_annotation/weights/best.pt` (không commit file `.pt`).
 
 | Chỉ số trên 10 ảnh eval | Giá trị |
 |---|---:|
-| Precision | |
-| Recall | |
-| mAP50 | |
-| mAP50–95 | |
+| Precision | 0.4071 |
+| Recall | 0.2340 |
+| mAP50 | 0.2737 |
+| mAP50–95 | 0.2018 |
 
-Ảnh dự đoán: [`assets/eval_predictions/`](assets/eval_predictions/) · log train và chỉ số: [`assets/yolo26_runs/`](assets/yolo26_runs/)
+Theo từng lớp (bước val trên `best.pt`):
 
-1. Lớp nào recall thấp nhất? Ảnh nào minh họa?
-2. Nếu mAP50 cao nhưng mAP50–95 thấp, cần kiểm điều gì trên box?
-3. Lỗi class nào có thể liên quan guideline? Dữ kiện nào hỗ trợ nhận xét?
-4. Vì sao không dùng 10 ảnh eval để train? Vai trò validation của chúng trong notebook là gì?
+| Lớp | Ảnh | Instances | P | R | mAP50 | mAP50–95 |
+|---|---:|---:|---:|---:|---:|---:|
+| car | 10 | 94 | 0.836 | 0.653 | 0.738 | 0.523 |
+| truck | 5 | 5 | 0.656 | 0.200 | 0.239 | 0.206 |
+| bus | 2 | 2 | 0.000 | 0.000 | 0.014 | 0.005 |
+| van | 6 | 12 | 0.136 | 0.083 | 0.103 | 0.074 |
+
+Ảnh dự đoán: [`assets/eval_predictions/visuals/`](assets/eval_predictions/visuals/) (ví dụ [drive_052](assets/eval_predictions/visuals/drive_052.jpg), [drive_053](assets/eval_predictions/visuals/drive_053.jpg)) · log train: [`results.csv`](assets/yolo26_runs/vehicle_annotation/results.csv) · chỉ số eval: [confusion matrix](assets/yolo26_runs/vehicle_eval/confusion_matrix.png), [PR curve](assets/yolo26_runs/vehicle_eval/BoxPR_curve.png)
+
+Ghi nhận khi đối chiếu nhãn eval có sẵn trong repo (`dataset/labels/eval/`): các xe buýt lớn ở `drive_052`, `drive_053` mang ID 3 (`van` theo `data.yaml`), xe tải thùng ở `drive_051` mang ID 2 (`bus`). Đây là cùng kiểu lệch ID lớp đã thấy ở gold train, nên chỉ số `bus`/`van` trên eval cần đọc thận trọng.
+
+1. **Lớp nào recall thấp nhất? Ảnh nào minh họa?**
+
+   Theo bảng đánh giá trên `best.pt`, `bus` có recall thấp nhất là **0.000**, tiếp theo là `van` với **0.083**. Tập eval chỉ có 2 đối tượng mang nhãn `bus` và 12 đối tượng mang nhãn `van`, nên kết quả các lớp này còn nhạy với từng trường hợp. Trong [drive_051](assets/eval_predictions/visuals/drive_051.jpg), xe tải thùng phía trên bên phải mang ID 2 (`bus`) trong nhãn eval nhưng không được dự đoán đúng lớp đó. [drive_052](assets/eval_predictions/visuals/drive_052.jpg) và [drive_053](assets/eval_predictions/visuals/drive_053.jpg) minh họa thêm bất đồng `bus`/`van`: model dự đoán `bus` cho xe buýt lớn, trong khi các xe này mang ID 3 (`van`) trong nhãn eval.
+
+2. **Nếu mAP50 cao nhưng mAP50–95 thấp, cần kiểm điều gì trên box?**
+
+   Cần kiểm tra độ bám sát của box: cạnh box có lấy thừa nền, cắt mất xe, lệch tâm hoặc xử lý phần bị che/cắt khung không nhất quán hay không. mAP50 chấp nhận IoU từ 0.50, còn mAP50–95 tính trung bình trên các ngưỡng IoU 0.50 đến 0.95 nên đòi hỏi định vị chính xác hơn. Kết quả chung là **0.2737 so với 0.2018**; riêng `car` là **0.738 so với 0.523**. `car` có AP tốt nhất trong bốn lớp nhưng vẫn giảm khi siết ngưỡng IoU, vì vậy chưa thể chỉ từ mAP50 kết luận mọi box đều sát.
+
+3. **Lỗi class nào có thể liên quan guideline? Dữ kiện nào hỗ trợ nhận xét?**
+
+   Các ranh giới dễ nhầm là SUV/MPV giữa `car` và `van`, minibus giữa `bus` và `van`, hoặc xe chở hàng giữa `truck` và `van`. Guideline cần phân biệt theo loại xe, cấu trúc cabin/thùng và khoang chở khách, đồng thời giữ cùng ánh xạ ID ở train và eval. Dữ kiện cụ thể là xe buýt lớn trong `drive_052`/`drive_053` mang nhãn `van`, còn xe tải thùng trong `drive_051` mang nhãn `bus`; confusion matrix cũng thể hiện nhiều đối tượng nhãn `van` được model dự đoán thành `bus`. Đây là dấu hiệu cần kiểm tra tính nhất quán của nhãn và ánh xạ lớp. Bên cạnh đó, dữ liệu train lệch nhiều về `car`, nên không thể quy toàn bộ kết quả thấp của các lớp còn lại cho riêng guideline.
+
+4. **Vì sao không dùng 10 ảnh eval để train? Vai trò validation của chúng trong notebook là gì?**
+
+   Nếu đưa 10 ảnh eval vào train, model đã học từ chính các ảnh dùng để đánh giá, khiến chỉ số không còn phản ánh khả năng dự đoán trên ảnh chưa dùng để cập nhật trọng số. Trong notebook, tập này là validation để theo dõi các epoch và chọn `best.pt`, sau đó được dùng để chạy `val` và xem ảnh prediction. Vì đã tham gia chọn checkpoint, đây không phải test set độc lập. Giữ nguyên split 50 ảnh train và 10 ảnh eval giúp so sánh đúng theo quy trình của bài; muốn đánh giá độc lập hơn cần một tập test riêng chưa dùng để chọn model.
 
 ## 6. Khó khăn và cách xử lý
 
@@ -86,14 +106,12 @@ Kết quả: [`outputs/annotation_evaluation.json`](../../outputs/annotation_eva
 
 ## 7. Tự đánh giá theo rubric
 
-<!-- TODO sau CP5/CP6: đối chiếu RUBRIC.md -->
-
 | Hạng mục | Trạng thái |
 |---|---|
 | Mini guideline và ca mơ hồ | Có định nghĩa 4 lớp, quy tắc box, 4 ca mơ hồ có lý do |
 | Annotation + self-QC | 50/50 file, checker đạt |
 | Gold-set QC | Đã chạy, đạt: F1 0.5089 và mean IoU 0.8446 (ngưỡng F1 điều chỉnh 0.50) |
-| Pipeline YOLO và phân tích | Chưa chạy |
+| Pipeline YOLO và phân tích | Colab chạy được trên T4, giữ nguyên split (eval không dùng để train); có metrics, ảnh dự đoán 10 ảnh eval và log trong `assets/`. mAP50 0.2737 / mAP50–95 0.2018 |
 
 ## 8. Công cụ AI và tài liệu tham khảo
 
